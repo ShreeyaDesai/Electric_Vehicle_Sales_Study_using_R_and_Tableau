@@ -1,0 +1,494 @@
+# Loading the required libraries
+
+```{r}
+library(readr)
+library(hablar)
+library(skimr)
+library(gapminder)
+library(dplyr)
+library(ggplot2)
+library(kableExtra)
+library(tidyr)
+```
+
+# Reading the csv file
+```{r}
+evp <- read_csv("Electric_Vehicle_Population_Data.csv")
+```
+
+# View the first few rows of the dataset
+
+```{r}
+head(evp)
+```
+
+# This is used to get a look at the dataset
+
+```{r}
+glimpse(evp)
+summary(evp)
+evp
+```
+
+# Findings:
+
+# Total rows: 159467
+
+# The data types for each column are generally as expected, with most categorical variables being of type 'chr' and numerical variables such as 'Postal Code' being of type 'dbl'
+
+# Postal Code: The postal code is currently in double format (dbl), which is suitable for numerical calculations. However, since don't intend to perform mathematical operations on postal codes, we will consider converting it to character format (chr) to maintain leading zeros in postal codes
+
+# Model Year: This column represents the manufacturing year of the vehicle and is currently in double format. Converting it to integer format (int) would be more appropriate since model years are whole numbers.
+
+# Legislative District: This column represents legislative district numbers and is currently in double format. If these are whole numbers, consider converting them to integer format (int).
+
+# Using this function to count the number of missing values (NA) in each column of the 'evp' dataset.
+
+```{r}
+colSums(is.na(evp))
+```
+
+# The dataset has a few missing values in the 'County', 'City', 'Electric Utility' and 'Postal Code' columns, each with 4 missing entries, all being 4 rows
+
+# Vehicle Location has 9 missing values
+
+# Legislative District has 361 missing values
+
+#Count the number of unique values in each column of the dataset
+
+```{r}
+evp_unique <- summarize_all(evp, n_distinct)
+evp_unique
+```
+
+# Next, we check for duplicate rows in the dataset
+
+```{r}
+any(duplicated(evp))
+```
+
+# Check if any column in the dataset contains missing values and data type of columns
+
+```{r}
+skim(evp)
+```
+
+# Checking the percentage of NA
+
+```{r}
+colMeans(is.na(evp)) * 100
+```
+
+# Updating column names
+```{r}
+# Updating column names
+colnames(evp)[colnames(evp) == "VIN (1-10)"] <- "Vin"
+colnames(evp)[colnames(evp) == "Clean Alternative Fuel Vehicle (CAFV) Eligibility"] <- "Cafv Eligibility"
+
+# Creating a new cleaned dataframe
+evp_cleaned <- evp
+
+# Print the cleaned dataframe
+evp_cleaned
+```
+
+# Removing unwanted fields
+```{r}
+# Remove specified columns
+evp_cleaned <- evp_cleaned %>%
+  select(-`DOL Vehicle ID`, -`Electric Utility`, -`Vin`)
+
+# Display the modified dataset
+evp_cleaned
+
+```
+
+# Removing all the blank values
+```{r}
+
+# Remove rows with missing values in specified columns: 'County', 'City', and 'Postal Code' 
+evp_cleaned <- evp_cleaned %>%
+  filter(!is.na(County) & County != "",
+         !is.na(City) & City != "",
+         !is.na(`Postal Code`) & `Postal Code` != "")
+
+# Remove rows with missing values in 'Vehicle Location' column
+evp_cleaned <- evp_cleaned %>%
+  filter(!is.na(`Vehicle Location`) & `Vehicle Location` != "")
+
+# Remove rows with missing values in 'Legislative District' column
+evp_cleaned <- evp_cleaned %>%
+  filter(!is.na(`Legislative District`) & `Legislative District` != "")
+
+# Check now for NA/blank values
+colSums(is.na(evp_cleaned))
+
+# Print the modified dataset
+evp_cleaned
+
+```
+
+# Convert data types
+```{r}
+evp_cleaned <- evp_cleaned %>%
+  mutate(`Postal Code` = as.character(`Postal Code`),
+         `Model Year` = as.integer(`Model Year`))
+
+# Print the modified dataset
+evp_cleaned
+```
+
+# Checking dimensions after data cleaning
+```{r}
+dim(evp)
+dim(evp_cleaned)
+glimpse(evp_cleaned)
+```
+
+# Now that the data is cleaned, let's perform some exploratory data analysis.
+```{r}
+## Distribution of Electric Vehicles by Model Year
+model_year_distribution <- table(evp_cleaned$`Model Year`)
+print('Distribution of electric vehicles by model year:')
+print(model_year_distribution)
+
+# Distribution of electric vehicles by make
+make_distribution <- table(evp_cleaned$Make)
+print('Distribution of electric vehicles by make:')
+print(head(make_distribution, 20))  # Displaying top 20 makes
+```
+
+# Next, we will visualize the distribution of electric vehicles by model year and make.
+```{r}
+# Distribution by Model Year
+library(ggplot2)
+
+# Create a bar plot for the distribution of electric vehicles by model year
+ggplot(evp_cleaned, aes(x = `Model Year`)) +
+  geom_bar(stat = "count") +
+  labs(title = "Distribution of Electric Vehicles by Model Year",
+       x = "Model Year",
+       y = "Number of Vehicles") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Distribution by Make (Top 10)
+ggplot(evp_cleaned, aes(x = `Make`)) +
+  geom_bar(stat = "count") +
+  labs(title = "Top 10 Electric Vehicle Makes",
+       x = "Make",
+       y = "Number of Vehicles") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  coord_flip() +
+  scale_x_discrete(limits = head(names(sort(table(evp_cleaned$Make), decreasing = TRUE)), 10))
+```
+
+Observation: The visualizations provide a clear representation of the distribution of electric vehicles by model year and the prevalence of different makes in the market. The bar charts show the trends and the relative differences between the counts of vehicles for each category.
+
+
+# IMP: 
+# While analysing the data, we found there are no explicit columns for seasonal variations, government incentives, or charging infrastructure availability, which leaves us no way to find answers to the below questions stated in the proposal
+# 3.	Do seasonal variations impact EV adoption?
+# 4.	What role do government incentives and policies play in EV adoption?
+# 5.	How does the availability of charging infrastructure affect EV adoption?
+
+## We would introduce 3 new research questions instead.
+
+# Let's continue with a more advanced analysis.
+# To answer the questions stated in the proposal, we need to perform a series of analyses on the dataset.
+# Let's start by identifying the current trends in electric vehicle adoption.
+
+# Question 1:	What are the current trends in electric vehicle adoption in the dataset's region?
+```{r}
+# Electric Vehicle Adoption Trend by Model Year
+# Calculate the number of electric vehicles registered each year
+ev_adoption_trend <- table(evp_cleaned$`Model Year`)
+ev_adoption_trend
+
+# Plotting the trend of electric vehicle adoption over the years
+plot(ev_adoption_trend, type='o', col='blue', pch=16, xlab='Model Year', 
+     ylab='Number of Electric Vehicles Registered', 
+     main='Electric Vehicle Adoption Trend by Model Year', 
+     grid.col='lightgray')
+```
+Observation: The trend data and the corresponding line chart show the progression of electric vehicle registrations by model year, indicating a general increase in EV adoption over time, with notable growth starting from 2011 onwards.
+
+
+
+# Based on the available columns, let's analyze the distribution of EVs across different regions.
+# We will count the number of EVs by 'State' and 'Legislative District' to see if there are any patterns.
+
+# Question 2: Are there demographic patterns that influence EV adoption?
+To explore demographic patterns that may influence electric vehicle (EV) adoption, there are multiple ways. We can analyze the dataset based on various demographic-related features such as 'County', 'City', 'Postal Code', and '2020 Census Tract'. Additionally, we can look at the 'Electric Utility' as a proxy for infrastructure availability. 
+Here we will Aggregate the data by 'County' and 'City' to see the distribution of EVs.
+```{r}
+# Aggregating the data by 'County' and 'City' to 
+# see the distribution of EVs
+county_city_distribution <- evp_cleaned %>%
+  group_by(County, City) %>%
+  summarise(`EV Count` = n(), .groups = 'drop')
+
+# Sorting the data to see which areas have the highest number of EVs
+sorted_county_city_distribution <- county_city_distribution %>%
+  arrange(desc(`EV Count`))
+
+# Displaying the top areas with the highest EV counts
+head(sorted_county_city_distribution, 10)
+
+# Plotting the top areas with the highest EV counts
+top_areas_plot <- sorted_county_city_distribution %>%
+  head(10) %>%
+  ggplot(aes(x = `EV Count`, y = City)) +
+  geom_bar(stat = 'identity', fill = 'steelblue') +
+  labs(title = 'Top 10 Cities by Electric Vehicle Count by City',
+       x = 'EV Count',
+       y = 'City') +
+  theme_minimal()
+print(top_areas_plot)
+```
+Observation: The top areas with the highest counts of electric vehicles are predominantly in King County, with Seattle leading, followed by Bellevue and Redmond. This suggests a strong geographic pattern in EV adoption within this dataset, with certain cities showing significantly higher EV counts.
+
+
+# Question 3: What is the distribution of electric vehicle types (e.g., Battery Electric Vehicle, Plug-in Hybrid Electric Vehicle) in the dataset, and how has it evolved over time?
+```{r}
+# Set the theme for ggplot
+theme_set(theme_minimal())
+
+# Plotting the distribution of electric vehicle types over time
+ggplot(evp_cleaned, aes(x=`Model Year`, fill=`Electric Vehicle Type`)) +
+  geom_bar(position="stack", stat="count") +
+  labs(title="Distribution of Electric Vehicle Types Over Time",
+       x="Model Year",
+       y="Number of Vehicles") +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+```
+Observation: The chart above displays the distribution of electric vehicle types over time, categorized by model year. Each color represents a different type of electric vehicle, such as Battery Electric Vehicle (BEV) or Plug-in Hybrid Electric Vehicle (PHEV). Overall, the graph shows that electric vehicles are becoming increasingly popular. This is likely due to a number of factors, including rising gas prices, concerns about climate change, and government incentives. The number of BEVs has increased by more than 30 times since 2000, while the number of PHEVs has increased by more than 20 times. The number of electric vehicles on the road is expected to continue to grow in the coming years.
+
+
+# Question 4: What is the average electric range of vehicles by make, and how does this vary among the top manufacturers?
+```{r}
+# Grouping the data by 'Make' and calculating the average 'Electric Range'
+average_range_by_make <- evp_cleaned %>%
+  group_by(Make) %>%
+  summarize(Average_Electric_Range = mean(`Electric Range`)) %>%
+  arrange(desc(Average_Electric_Range))
+
+# Visualizing the top 10 manufacturers by average electric range
+ggplot(head(average_range_by_make, 10), aes(x=Make, y=Average_Electric_Range, fill=Make)) +
+  geom_bar(stat="identity") +
+  labs(title="Top 10 Manufacturers by Average Electric Range",
+       x="Make",
+       y="Average Electric Range (miles)") +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+Observation: The bar chart displays the top 10 manufacturers by average electric range. Each bar represents the average electric range of vehicles produced by that manufacturer. 
+Jaguar leads with the highest average electric range, slightly above 200 miles.
+Tesla follows as the second highest, with a range between 150 and 175 miles.
+Audi and Azure Dynamics have the lowest average ranges, under 50 miles.
+Other manufacturers like Chevrolet, Fiat, Nissan, Smart, Think, and Wheego Electric Cars have ranges mostly between 75 to 125 miles.
+
+
+# Question 5: How does the distribution of electric vehicles vary across different counties and cities within the dataset's region?
+```{r}
+# Set the theme for ggplot
+theme_set(theme_minimal())
+
+# Get the top 10 counties
+top_counties <- head(names(sort(table(evp_cleaned$County), decreasing = TRUE)), 10)
+
+# Filter the dataset for the top 10 counties
+evp_top_counties <- subset(evp_cleaned, County %in% top_counties)
+
+# Plotting the distribution of electric vehicles across top 10 counties
+ggplot(evp_top_counties, aes(x=`County`, fill=`County`)) +
+  geom_bar() +
+  labs(title="Distribution of Electric Vehicles Across Top 10 Counties",
+       x="County",
+       y="Number of Vehicles") +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+Observation: The chart above illustrates the top 10 counties with the highest number of electric vehicles. Each bar represents the number of electric vehicles registered in that county. This chart provides a clear visual representation of the disparity in electric vehicle distribution among these counties, with one county leading by a substantial margin.
+The key takeaway is that King County has by far the most electric vehicles, with almost 80,000. Snohomish County has the second most with around 20,000 vehicles. The distribution is highly skewed towards King County.
+
+# Next, we will investigate the relationship between electric range and vehicle adoption to address range anxiety concerns. We will calculate the average electric range for vehicles registered each year to see if there's a trend.
+
+# Question 6:	Is there a relationship between "range anxiety" and EV adoption?
+```{r}
+# Grouping the data by 'Model Year' and calculating the average 'Electric Range'
+avg_range_by_year <- tapply(evp_cleaned$`Electric Range`, evp_cleaned$`Model Year`, mean)
+
+# Plotting the average electric range over the years
+plot(names(avg_range_by_year), avg_range_by_year, type='o', col='blue', pch=16, xlab='Model Year', ylab='Average Electric Range (miles)', main='Average Electric Range by Model Year', grid.col='lightgray')
+
+# Output the average electric range data
+print("Average electric range by model year:")
+print(avg_range_by_year)
+```
+Observation: These trends suggest that while there has been progress in electric vehicle technology, resulting in increased ranges, there are also periods of regression or stagnation. The sharp decline after the peak could indicate a variety of factors, such as changes in the types of electric vehicles being produced, market shifts, or other external influences not explained by the graph alone.
+The graph shows the average electric range of vehicles by model year, with a general upward trend indicating improvements in electric vehicle technology over time. However, there are fluctuations, including a significant drop around 2010 and a peak near 2020, followed by a sharp decline and a slight recovery towards the latest years. This suggests progress in electric vehicle ranges, with periods of regression or stagnation possibly due to market shifts or other factors.
+
+
+# Now, let's identify the most popular EV models based on registration counts. We will count the number of registrations for each model and display the top 10 most popular models.
+
+# Question 7:	Are certain EV models preferred over others by consumers?
+```{r}
+# Counting the number of registrations for each model
+ev_model_counts <- table(evp_cleaned$Model)
+
+# Displaying the top 10 most popular EV models
+print("Top 10 most popular EV models by number of registrations:")
+print(head(ev_model_counts[order(ev_model_counts, decreasing = TRUE)], 10))
+
+# Plotting the top 10 most popular EV models
+barplot(head(ev_model_counts[order(ev_model_counts, decreasing = TRUE)], 10), 
+        main="Top 10 Most Popular EV Models", xlab="Model", 
+        ylab="Number of Registrations", col="skyblue", las=2, cex.names=0.8)
+```
+Observation: The top 10 most popular EV models by number of registrations have been identified. "MODEL Y" and "MODEL 3" are the most popular EV models based on the number of registrations, with a significant lead over the other models listed. There is a clear drop in popularity after the top three models, with the remaining seven models having relatively similar but lower numbers of registrations.
+
+
+# Let's analyze the distribution of EVs across different years to understand the trend of EV adoption over time. We will count the number of EVs registered each year and visualize the trend.
+# Question 8:	Is there a trend of EV adoption over time?
+```{r}
+
+# Counting the number of EVs by Model Year
+ev_by_year <- table(evp_cleaned$`Model Year`)
+
+# Visualizing the trend of EV adoption over the years
+barplot(ev_by_year, main="EV Adoption Trend by Model Year", xlab="Model Year", ylab="Number of Electric Vehicles", col="skyblue", las=2, cex.names=0.8)
+
+# Output the number of EVs by Model Year
+ev_by_year
+
+```
+Observation: The bar chart and data table show the number of electric vehicles registered each year, indicating a clear upward trend in EV adoption, especially in recent years. This trend reflects the growing popularity and acceptance of electric vehicles.
+
+
+```{r}
+df <- read.csv("Electric_Vehicle_Population_Data.csv")
+df <- na.omit(df)
+colSums(is.na(df))
+```
+
+```{r}
+# Install the 'class' package if not already installed
+install.packages("class")
+# Load the 'class' package
+library(class)
+
+df <- read.csv("Electric_Vehicle_Population_Data.csv")
+
+head(df)
+summary(df)
+# Select relevant columns
+df <- df[, c("County", "Electric.Vehicle.Type","Electric.Range", "Make","Model")]
+names(df)
+# Convert CAFV Eligibility to numerical using factor
+df$EVT_Encoded <- as.numeric(factor(df$Electric.Vehicle.Type))
+df$C_Encoded <- as.numeric(factor(df$County))
+df$M_Encoded <- as.numeric(factor(df$Make))
+# glimpse(df)
+# Drop the original categorical column
+df <- df[, c("C_Encoded","EVT_Encoded","Electric.Range", "M_Encoded","Model")]
+
+# Split the data into features (X) and target variable (y)
+X <- df[, c("C_Encoded", "EVT_Encoded","Electric.Range","M_Encoded")]
+y <- df$Model
+
+# Split the data into training and testing sets
+set.seed(42)  # for reproducibility
+split_index <- sample(1:nrow(df), 0.8 * nrow(df))
+train_data <- df[split_index, ]
+test_data <- df[-split_index, ]
+
+sum(is.na(train_data[, c("C_Encoded","EVT_Encoded", "Electric.Range","M_Encoded")]))  
+# Check for missing values in the specified columns
+
+# Check for missing values in the testing set
+sum(is.na(test_data[, c("C_Encoded","EVT_Encoded", "Electric.Range","M_Encoded")]))  
+# Check for missing values in the specified columns
+# Remove rows with missing values in either the training or testing set
+train_data <- na.omit(train_data)
+test_data <- na.omit(test_data)
+
+# Now, you can proceed with the k-NN model
+train_data <- unique(train_data)
+
+# Feature Scaling
+train_data$C_Encoded <- scale(train_data$C_Encoded)
+test_data$C_Encoded <- scale(test_data$C_Encoded)
+
+# Optimal Value of k
+k_values <- seq(1, 30, by = 2)  # Try a range of odd values
+accuracies <- numeric(length(k_values))
+
+for (i in seq_along(k_values)) {
+  knn_model <- knn(train = train_data[, c("C_Encoded", "EVT_Encoded", "Electric.Range","M_Encoded")], 
+                   test = test_data[, c("C_Encoded", "EVT_Encoded", "Electric.Range","M_Encoded")], 
+                   cl = train_data$Model, 
+                   k = k_values[i])
+  accuracies[i] <- sum(knn_model == test_data$Model) / length(test_data$Model)
+}
+
+optimal_k <- k_values[which.max(accuracies)]
+
+# Initialize the k-NN model with optimal C_Encoded
+knn_model <- knn(train = train_data[, c("C_Encoded", "EVT_Encoded", "Electric.Range","M_Encoded")], 
+                 test = test_data[, c("C_Encoded", "EVT_Encoded", "Electric.Range","M_Encoded")], 
+                 cl = train_data$Model, 
+                 k = optimal_k)
+
+# Evaluate the model
+accuracy <- sum(knn_model == test_data$Model) / length(test_data$Model)
+
+# Print the result
+cat("Optimal k:", optimal_k, "\n")
+cat("Accuracy:", sprintf("%.2f%%", accuracy * 100), "\n")
+```
+
+# 1. Line Plot for Accuracy vs. k:
+```{r}
+# Create a data frame for plotting
+plot_data <- data.frame(k = k_values, accuracy = accuracies)
+
+# Plotting accuracy vs. k
+ggplot(plot_data, aes(x = k, y = accuracy)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Accuracy vs. k Values",
+       x = "k Values",
+       y = "Accuracy")
+```
+#  It generates a line plot showing how the accuracy changes as 'k' varies. The accuracy of the KNN model increases from 0.65 to 0.72 as the number of nearest neighbors increases from 0 to 10. After that point, the accuracy of the model begins to decrease. This suggests that the optimal value of K for this dataset is between 10 and 15. Based on the plot, it is likely that the KNN model is overfitting the training data when the number of nearest neighbors is greater than 10. This is because the model is becoming too complex and is learning the noise in the training data.
+
+```{r}
+# Evaluate the model
+predictions <- knn_model  # Predictions on the test set
+
+# Confusion Matrix
+conf_matrix <- table(Actual = test_data$Model, Predicted = predictions)
+print("Confusion Matrix:")
+print(conf_matrix)
+```
+
+```{r}
+# Visualize the data using boxplots or scatter plots
+boxplot(train_data[, -c(1, 5)])
+pairs(train_data[, -c(1, 5)])
+
+```
+# First image:
+This image shows a box and whisker plot of electric range vs EVT encoded. A box and whisker plot is a way of visually summarizing the distribution of a set of data. The box represents the middle 50% of the data, with the whiskers extending to the most extreme points that are still within 1.5 times the interquartile range (IQR). The IQR is the difference between the third and first quartiles, and it represents the middle 50% of the data.
+
+The plot shows that there is a positive correlation between electric range and EVT encoded. This means that as EVT encoded increases, so does electric range. However, there is also a lot of variation in electric range for each given value of EVT encoded. This is shown by the large size of the boxes.
+
+One possible explanation for this variation is that there are other factors that also affect electric range, such as the type of vehicle, the weight of the vehicle, and the driving conditions.
+
+Overall, the plot suggests that EVT encoded is a good predictor of electric range, but it is not the only factor that affects it.
+
+# Second Image:
+The plot also shows that there is a negative correlation between M_Encoded and Electric Range. This means that as M_Encoded increases, Electric Range decreases. However, the correlation between M_Encoded and Electric Range is weaker than the correlation between EV_Encoded and Electric Range.
+
+Overall, the plot suggests that EV_Encoded is a better predictor of Electric Range than M_Encoded. However, it is important to note that there are other factors that may also affect Electric Range, such as the type of vehicle, the weight of the vehicle, and the driving conditions.
