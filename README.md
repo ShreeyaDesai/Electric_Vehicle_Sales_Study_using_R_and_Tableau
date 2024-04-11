@@ -1,4 +1,4 @@
-# Electric-Vehicle-Population-Data-Using-R
+# Electric Vehicle (EV) Sales Study
 
 The research aims to leverage technological advancements to support electric vehicle (EV) enthusiasts. Through comprehensive data analysis, we seek to enhance our understanding of EV economy, battery performance, and user behavior. This study is vital 
 for refining EV design, overcoming early challenges, and predicting future trends. Our initiative serves as a valuable resource for manufacturers, governments, and consumers, empowering them to make informed decisions based on empirical evidence. 
